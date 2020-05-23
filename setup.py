@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="simpy_helpers",
-    version="1.0.0",
+    version="1.0.1",
     author="Brian Ambielli",
     author_email="brian.ambielli@gmail.com",
     description="A package to help simplify simpy simulation",
@@ -20,7 +20,7 @@ setuptools.setup(
     ],
     python_requires='>=3.6',
     install_requires=[
-        "simpy>=3,<=4",
+        "simpy>=3,<=5",
         "numpy"
     ]
 )
