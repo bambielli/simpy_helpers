@@ -143,6 +143,9 @@ class Entity:
     
     def now(self):
         return self.env.now
+    
+    def wait(self, timeout=0):
+        return self.env.timeout(timeout)
 
     def _calculate_waiting_time_for_resource(self, resource_name):
         if not self.did_visit_resource(resource_name):

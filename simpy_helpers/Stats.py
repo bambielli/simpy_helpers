@@ -71,6 +71,12 @@ class Stats:
         except KeyError:
             # resource wasn't visited, return a list of zeros
             return resource._zeros(sample_frequency)
+
+    @staticmethod
+    def container_level_over_time(container, sample_frequency=1):
+        Stats._check_for_instance_or_raise()
+        return container.level_over_time(sample_frequency)
+        
     
     @staticmethod
     def _add_resource(resource):

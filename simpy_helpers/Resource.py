@@ -18,7 +18,7 @@ class ResourceStatsMixin:
         rounded_event_list = ResourceStatsMixin._rounded_event_list(event_list, decimals)
         current_size = 0
         event_list_over_time = []
-        for i in np.around(np.arange(0, env.now, sample_frequency), decimals):
+        for i in np.around(np.arange(0, env.now + 1, sample_frequency), decimals):
             if i in rounded_event_list:
                 # we found an activity that happened here
                 last_queue_check = rounded_event_list[i][-1][0]
@@ -42,41 +42,7 @@ class ResourceStatsMixin:
                 rounded_event_list[rounded_time].append((size, status))
             else:
                 rounded_event_list[rounded_time] = [(size, status)]
-        return rounded_event_list
-    
-    def __init__(self, env, *args, **kwargs):
-        super().__init__(env, *args, **kwargs)
-        if self.service_time is None:
-            raise NotImplementedError("You must define a function called 'service_time' in your Resource class")
-        self.queue_size = []
-        self.utilization_size = []
-        self.env = env
-        self.name = self.__class__.__name__
-
-    def request(self, *args, **kwargs):
-        req = super().request(*args, **kwargs)
-        self.add_resource_check(event='request')
-        return req
-
-    def release(self, *args, **kwargs):
-        rel = super().release(*args, **kwargs)
-        self.utilization_size.append((self.env.now, self.count, 'release'))
-        return rel
-    
-    def queue_size_over_time(self, sample_frequency=1):
-        return ResourceStatsMixin._over_time(self.env, self.queue_size, sample_frequency)
-    
-    def number_being_processed_over_time(self, sample_frequency=1):
-        return ResourceStatsMixin._over_time(self.env, self.utilization_size, sample_frequency)
-    
-    def utilization_over_time(self, sample_frequency=1):
-        # iterate through each event, calculate the utilization
-        utilization = [(x, np.around(y / float(self.capacity), decimals=2), e) for x, y, e in self.utilization_size]
-        return ResourceStatsMixin._over_time(self.env, utilization, sample_frequency)    
-    
-    def add_resource_check(self, event='start'):
-        self.utilization_size.append((self.env.now, self.count, event))
-        self.queue_size.append((self.env.now, len(self.queue), event))
+        return rounded_event_list  
     
     def now(self):
         return self.env.now
@@ -91,4 +57,62 @@ class ResourceStatsMixin:
 
 # all resources are priority resources
 class Resource(ResourceStatsMixin, simpy.PriorityResource):
-    pass
+    def __init__(self, env, *args, **kwargs):
+        super().__init__(env, *args, **kwargs)
+        if self.service_time is None:
+            raise NotImplementedError("You must define a function called 'service_time' in your Resource class")
+        self.queue_size = []
+        self.utilization_size = []
+        self.env = env
+        self.name = self.__class__.__name__
+        
+    def request(self, *args, **kwargs):
+        req = super().request(*args, **kwargs)
+        self.add_resource_check(event='request')
+        return req
+
+    def release(self, *args, **kwargs):
+        rel = super().release(*args, **kwargs)
+        self.utilization_size.append((self.env.now, self.count, 'release'))
+        return rel
+    
+    def add_resource_check(self, event='start'):
+        self.utilization_size.append((self.env.now, self.count, event))
+        self.queue_size.append((self.env.now, len(self.queue), event))
+
+    def queue_size_over_time(self, sample_frequency=1):
+        return ResourceStatsMixin._over_time(self.env, self.queue_size, sample_frequency)
+    
+    def number_being_processed_over_time(self, sample_frequency=1):
+        return ResourceStatsMixin._over_time(self.env, self.utilization_size, sample_frequency)
+    
+    def utilization_over_time(self, sample_frequency=1):
+        # iterate through each event, calculate the utilization
+        utilization = [(x, np.around(y / float(self.capacity), decimals=2), e) for x, y, e in self.utilization_size]
+        return ResourceStatsMixin._over_time(self.env, utilization, sample_frequency)  
+
+class Container(ResourceStatsMixin, simpy.Container):
+    """
+    Container with amount tracking over time.
+    """
+    def __init__(self, env, *args, **kwargs):
+        super().__init__(env, *args, **kwargs)
+        self.level_tracker = []
+        self.env = env
+        self.name = self.__class__.__name__
+        self.level_tracker.append((self.env.now, self.level, "init"))
+        
+    def put(self, amount):
+        super().put(amount)
+        self.add_resource_check()
+    
+    def get(self, amount):
+        retrieved_amount = super().get(amount)
+        self.add_resource_check(event="get")
+        return retrieved_amount
+
+    def add_resource_check(self, event="put"):
+        self.level_tracker.append((self.env.now, self.level, event))
+    
+    def level_over_time(self, sample_frequency=1):
+        return ResourceStatsMixin._over_time(self.env, self.level_tracker, sample_frequency)
