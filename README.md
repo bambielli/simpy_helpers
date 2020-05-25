@@ -24,3 +24,5 @@ Simpy does not collect statistics for you...
 ## API Documentation
 
 See the [Using_Simpy_Helpers_Package.ipynb](./Using_Simpy_Helpers_Package.ipynb) notebook for more detail, and a walkthrough of a simple M/M/K simulation using helper classes.
+
+For info on a simulation that involves a container, see [Container_Resource_Example.ipynb](./Container_Resource_Example.ipynb)
