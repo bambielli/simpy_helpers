@@ -17,8 +17,10 @@ class Stats:
         return Stats.summary._get_disposed_entities()
     
     @staticmethod
-    def get_total_times(attributes=None):
+    def get_total_times(resource=None, attributes=None):
         Stats._check_for_instance_or_raise()
+        if resource is not None:
+            return Stats.summary._get_total_times_for_resource(resource, attributes)
         filtered_entities = Stats.summary._filter_entities(attributes)
         return [entity.get_total_time() for entity in filtered_entities]
 
@@ -112,6 +114,12 @@ class Stats:
         filtered_entities = self._filter_entities(attributes)
         processing_times = [entity.get_processing_time_for_resource(resource) for entity in filtered_entities]
         return [time for time in processing_times if time is not None]
+    
+    def _get_total_times_for_resource(self, resource, attributes):
+        filtered_entities = self._filter_entities(attributes)
+        waiting_times = self._get_waiting_times_for_resource(resource, attributes)
+        processing_times = self._get_processing_times_for_resource(resource, attributes)
+        return [t1 + t2 for t1, t2 in zip(waiting_times, processing_times)]
 
     def _get_disposed_entities(self):
         return [entity for entity in Stats.summary.entities if entity.is_disposed()]
