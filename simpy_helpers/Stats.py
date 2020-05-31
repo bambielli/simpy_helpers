@@ -17,7 +17,7 @@ class Stats:
         return Stats.summary._get_disposed_entities()
     
     @staticmethod
-    def get_total_times(resource=None, attributes=None):
+    def get_total_times(resource=None, attributes={}):
         Stats._check_for_instance_or_raise()
         if resource is not None:
             return Stats.summary._get_total_times_for_resource(resource, attributes)
@@ -25,7 +25,7 @@ class Stats:
         return [entity.get_total_time() for entity in filtered_entities]
 
     @staticmethod
-    def get_waiting_times(resource=None, attributes=None):
+    def get_waiting_times(resource=None, attributes={}):
         Stats._check_for_instance_or_raise()
         
         if resource is not None:
@@ -35,7 +35,7 @@ class Stats:
         return [entity.get_total_waiting_time() for entity in filtered_entities]
     
     @staticmethod
-    def get_processing_times(resource=None, attributes=None):
+    def get_processing_times(resource=None, attributes={}):
         Stats._check_for_instance_or_raise()
         
         if resource is not None:
@@ -96,30 +96,32 @@ class Stats:
             raise Exception("Run a simulation before querying for statistics")
     
     @staticmethod
-    def _filter_entities_on_matched_attributes(entities=[], attributes=None):
-        if attributes is not None:
+    def _filter_entities_on_matched_attributes(entities=[], attributes={}):
+        if attributes:
             return [entity for entity in entities if entity.matches_attributes(attributes)]
         return entities
     
-    def _filter_entities(self, attributes):
-        disposed_entities = Stats.summary._get_disposed_entities()
-        return Stats._filter_entities_on_matched_attributes(disposed_entities, attributes)
+    def _filter_entities(self, attributes={}):
+        if "disposed" not in attributes:
+            # default is that we filter for only disposed entities. This can be overridden
+            attributes["disposed"] = True
+        return Stats._filter_entities_on_matched_attributes(self.entities, attributes)
 
-    def _get_waiting_times_for_resource(self, resource, attributes):
+    def _get_waiting_times_for_resource(self, resource, attributes={}):
         filtered_entities = self._filter_entities(attributes)
         waiting_times = [entity.get_waiting_time_for_resource(resource) for entity in filtered_entities]
         return [time for time in waiting_times if time is not None]
     
-    def _get_processing_times_for_resource(self, resource, attributes):
+    def _get_processing_times_for_resource(self, resource, attributes={}):
         filtered_entities = self._filter_entities(attributes)
         processing_times = [entity.get_processing_time_for_resource(resource) for entity in filtered_entities]
         return [time for time in processing_times if time is not None]
     
-    def _get_total_times_for_resource(self, resource, attributes):
+    def _get_total_times_for_resource(self, resource, attributes={}):
         filtered_entities = self._filter_entities(attributes)
         waiting_times = self._get_waiting_times_for_resource(resource, attributes)
         processing_times = self._get_processing_times_for_resource(resource, attributes)
         return [t1 + t2 for t1, t2 in zip(waiting_times, processing_times)]
-
+    
     def _get_disposed_entities(self):
         return [entity for entity in Stats.summary.entities if entity.is_disposed()]

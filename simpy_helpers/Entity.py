@@ -31,8 +31,10 @@ class Entity:
         self.attributes["priority"] = priority
         self.env = env
         self.creation_time = None
-        self.resources_requested = OrderedDict()
         self.disposal_time = None # remember to dispose of entities after finishing processing!
+        self.attributes["disposed"] = False
+        self.resources_requested = OrderedDict()
+
     
     def __str__(self):
         return f"{self.name} created_at: {self.creation_time} attributes: {self.attributes}"
@@ -50,22 +52,16 @@ class Entity:
         total time that the entity spent in the system (from creation to disposal)
         only accessible once the entity has been disposed
         """
-        if self.is_disposed():
-            self._calculate_statistics()
-            return self.total_time
-        else:
-            raise Exception("Can't get total time: Entity has not been disposed")
+        self._calculate_statistics()
+        return self.total_time
     
     def get_total_waiting_time(self):
         """
         total time that the entity spent queued waiting for resources
         only accessible wonce the entity has been disposed
         """
-        if self.is_disposed():
-            self._calculate_statistics()
-            return self.waiting_time
-        else:
-            raise Exception("Can't get total waiting time: Entity has not been disposed")
+        self._calculate_statistics()
+        return self.waiting_time
 
     def get_waiting_time_for_resource(self, resource):
         """
@@ -77,11 +73,9 @@ class Entity:
         """
         total time that the entity spent being processed by resources
         """
-        if self.is_disposed():
-            self._calculate_statistics()
-            return self.processing_time
-        else:
-            raise Exception("Can't get total processing time: Entity has not been disposed")
+        self._calculate_statistics()
+        return self.processing_time
+
 
     def get_processing_time_for_resource(self, resource):
         """
@@ -132,11 +126,12 @@ class Entity:
         After an entity is finished being processed, it should be disposed
         """
         self.disposal_time = self.env.now
+        self.attributes["disposed"] = True
         Debug.info(f"{self.name} disposed: {self.disposal_time}")
         return self.disposal_time
 
     def is_disposed(self):
-        return self.disposal_time is not None
+        return self.attributes["disposed"]
     
     def did_visit_resource(self, resource_name):
         return resource_name in self.resources_requested
@@ -146,11 +141,45 @@ class Entity:
     
     def wait(self, timeout=0):
         return self.env.timeout(timeout)
-
+    
+    def _fill_in_for_non_disposed(self):
+        """
+        Sometimes we might want to get statistics for entities that haven't been disposed
+        Entities could be in several different places in simulation, they could be in queue
+        they could have just been created without accessing any resources
+        they could have just accessed one of N resources
+        They could have been in the middle of processing at a resource
+        We want to fill in all of these potential scenarios with a heuristic of self.env.now
+        """
+        for name, resource_dict in self.resources_requested.items():
+            if resource_dict["request"] is not None:
+                # this means we are currently processing at the resource in some capacity and we should fill in the rest of our stats
+                # we can figure out what stage we are at by looking at the size of each array. If size does not match the arrival_time size
+                # then we should append self.env.now to the end of the list
+                arrival_size = len(resource_dict["arrival_time"])
+                start_size = len(resource_dict["start_service_time"])
+                finish_size = len(resource_dict["finish_service_time"])
+                
+                # it should only ever be one length different max.
+                if start_size < arrival_size:
+                    resource_dict["start_service_time"].append(self.env.now)
+                if finish_size < arrival_size:
+                    resource_dict["finish_service_time"].append(self.env.now)
+                
+            self.resources_requested[name] = resource_dict
+            
+        self.disposal_time = self.env.now
+                
+            
+        
+    
     def _calculate_waiting_time_for_resource(self, resource_name):
         if not self.did_visit_resource(resource_name):
             return None
         
+        if not self.is_disposed():
+            self._fill_in_for_non_disposed()
+            
         resource_stats = self.resources_requested[resource_name]
         return sum([start_time - arrival_time for start_time, arrival_time in zip(resource_stats["start_service_time"], resource_stats["arrival_time"])])
 
@@ -158,12 +187,13 @@ class Entity:
         if not self.did_visit_resource(resource_name):
             return None
         
+        if not self.is_disposed():
+            self._fill_in_for_non_disposed()
+        
         resource_stats = self.resources_requested[resource_name]
         return sum([finish_time - start_time for finish_time, start_time in zip(resource_stats["finish_service_time"], resource_stats["start_service_time"])])
 
     def _calculate_statistics(self):
-        if not self.is_disposed():
-            raise Exception("Entity is not yet disposed. Dispose of this entity before calculating stats")
         waiting_time = 0
         processing_time = 0
         for resource_name, _ in self.resources_requested.items():
