@@ -1,0 +1,2 @@
+simpy<=5,>=3
+numpy
