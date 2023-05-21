@@ -9,7 +9,7 @@ The `simpy_helpers` package was written to make building simulations and collect
 3. Source
 4. Stats
 
-These building blocks allow you to build complex simulations quickly, while hiding much of the necessary orchestration of simpy components hidden from the user.
+These building blocks allow you to build complex simulations quickly, while keeping much of the necessary orchestration of simpy components hidden from the user.
 
 Entity, Resource and Source are `abstract classes`. Read the API documentation to learn which methods are required for building a simulation.
 
